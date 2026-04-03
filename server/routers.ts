@@ -12,18 +12,136 @@ import {
   createProgressionSummary,
   getLatestProgressionSummary,
   getProgressionSummaries,
+  getUserByUsername,
+  upsertUser,
+  getUserByOpenId,
 } from "./db/db.js";
 import { invokeLLM } from "./lib/llm.js";
 import { TRPCError } from "@trpc/server";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { ENV } from "./env.js";
 
 export const appRouter = router({
   auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user ?? null),
+    me: publicProcedure.query((opts) => {
+      const user = opts.ctx.user;
+      if (!user) return null;
+      // Never send passwordHash to the client
+      const { passwordHash: _, ...safeUser } = user;
+      return safeUser;
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
+
+    /** Register a new account with username + password */
+    register: publicProcedure
+      .input(
+        z.object({
+          username: z
+            .string()
+            .min(3, "Username must be at least 3 characters")
+            .max(30, "Username must be at most 30 characters")
+            .regex(
+              /^[a-zA-Z0-9_-]+$/,
+              "Username can only contain letters, numbers, hyphens, and underscores"
+            ),
+          password: z
+            .string()
+            .min(6, "Password must be at least 6 characters"),
+          name: z.string().min(1, "Display name is required").max(100),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const existing = await getUserByUsername(input.username);
+        if (existing) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Username already taken",
+          });
+        }
+
+        const passwordHash = await bcrypt.hash(input.password, 12);
+        const openId = `local:${input.username}`;
+
+        await upsertUser({
+          openId,
+          username: input.username,
+          passwordHash,
+          name: input.name,
+          loginMethod: "local",
+          lastSignedIn: new Date(),
+        });
+
+        const user = await getUserByOpenId(openId);
+        if (!user) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to create user",
+          });
+        }
+
+        const token = jwt.sign({ openId }, ENV.cookieSecret, {
+          expiresIn: "1y",
+        });
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
+
+        return {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+        };
+      }),
+
+    /** Sign in with username + password */
+    login: publicProcedure
+      .input(
+        z.object({
+          username: z.string().min(1, "Username is required"),
+          password: z.string().min(1, "Password is required"),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const user = await getUserByUsername(input.username);
+        if (!user || !user.passwordHash) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Invalid username or password",
+          });
+        }
+
+        const valid = await bcrypt.compare(input.password, user.passwordHash);
+        if (!valid) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Invalid username or password",
+          });
+        }
+
+        // Update last signed in
+        await upsertUser({
+          openId: user.openId,
+          lastSignedIn: new Date(),
+        });
+
+        const token = jwt.sign(
+          { openId: user.openId },
+          ENV.cookieSecret,
+          { expiresIn: "1y" }
+        );
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
+
+        return {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+        };
+      }),
   }),
 
   journal: router({

@@ -23,6 +23,8 @@ function createTables(sqlite: Database.Database) {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       openId TEXT NOT NULL UNIQUE,
+      username TEXT UNIQUE,
+      passwordHash TEXT,
       name TEXT,
       email TEXT,
       loginMethod TEXT,
@@ -183,6 +185,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
   if (user.name !== undefined) updateSet.name = user.name ?? null;
   if (user.email !== undefined) updateSet.email = user.email ?? null;
+  if (user.username !== undefined) updateSet.username = user.username ?? null;
+  if (user.passwordHash !== undefined) updateSet.passwordHash = user.passwordHash ?? null;
   if (user.loginMethod !== undefined)
     updateSet.loginMethod = user.loginMethod ?? null;
   if (user.lastSignedIn !== undefined)
@@ -202,6 +206,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   db.insert(users)
     .values({
       openId: user.openId,
+      username: user.username ?? null,
+      passwordHash: user.passwordHash ?? null,
       name: user.name ?? null,
       email: user.email ?? null,
       loginMethod: user.loginMethod ?? null,
@@ -224,6 +230,18 @@ export async function getUserByOpenId(
     .select()
     .from(users)
     .where(eq(users.openId, openId))
+    .limit(1)
+    .get();
+}
+
+export async function getUserByUsername(
+  username: string
+): Promise<User | undefined> {
+  const db = getDb();
+  return db
+    .select()
+    .from(users)
+    .where(eq(users.username, username))
     .limit(1)
     .get();
 }

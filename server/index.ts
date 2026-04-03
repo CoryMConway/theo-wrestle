@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "./routers.js";
 import { ENV } from "./env.js";
-import { getUserByOpenId, upsertUser, seedDb } from "./db/db.js";
+import { getUserByOpenId, getDb } from "./db/db.js";
 import { COOKIE_NAME } from "../shared/const.js";
 import jwt from "jsonwebtoken";
 import type { TrpcContext } from "./context.js";
@@ -20,13 +20,8 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(cookieParser());
 app.use(express.json());
 
-// ─── Dev Auth Bypass ─────────────────────────────────────────────────
-// In development without OAuth, auto-create a dev user session
-const DEV_USER_OPEN_ID = "dev-user";
-
-if (ENV.isDemoMode) {
-  seedDb(DEV_USER_OPEN_ID);
-}
+// Ensure database is initialized on startup
+getDb();
 
 // ─── Auth Middleware Helper ──────────────────────────────────────────
 async function getUserFromRequest(
@@ -46,36 +41,6 @@ async function getUserFromRequest(
     return null;
   }
 }
-
-// ─── Dev Login Route ─────────────────────────────────────────────────
-app.get("/api/dev-login", async (req, res) => {
-  if (!ENV.isDemoMode) {
-    return res.status(404).json({ error: "Not found" });
-  }
-
-  await upsertUser({
-    openId: DEV_USER_OPEN_ID,
-    name: "Dev User",
-    email: "dev@theowrestle.local",
-    loginMethod: "local",
-    role: "admin",
-    lastSignedIn: new Date(),
-  });
-
-  const token = jwt.sign({ openId: DEV_USER_OPEN_ID }, ENV.cookieSecret, {
-    expiresIn: "1y",
-  });
-
-  res.cookie(COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: ENV.isProduction,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 1000 * 60 * 60 * 24 * 365,
-  });
-
-  return res.redirect("/");
-});
 
 // ─── tRPC ────────────────────────────────────────────────────────────
 app.use(
@@ -102,9 +67,6 @@ if (ENV.isProduction) {
 const port = ENV.port;
 app.listen(port, () => {
   console.log(`[Server] TheoWrestle running on http://localhost:${port}`);
-  if (ENV.isDemoMode) {
-    console.log(`[Server] Demo mode — SQLite DB, auto-login enabled`);
-  }
   if (!ENV.isProduction) {
     console.log(`[Server] Client dev server at http://localhost:5173`);
   }

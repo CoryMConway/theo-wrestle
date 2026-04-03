@@ -19,7 +19,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { getLoginUrl } from "@/lib/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   BookOpen,
@@ -32,7 +31,7 @@ import {
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
-import { Button } from "@/components/ui/button";
+import AuthPage from "@/pages/AuthPage";
 
 const menuItems = [
   { icon: PenLine, label: "New Entry", path: "/" },
@@ -54,7 +53,7 @@ export default function DashboardLayout({
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
-  const { loading, user } = useAuth();
+  const { loading, user, refresh } = useAuth();
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
@@ -65,30 +64,7 @@ export default function DashboardLayout({
   }
 
   if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
-          <div className="flex flex-col items-center gap-2">
-            <BookOpen className="h-12 w-12 text-primary mb-2" />
-            <h1 className="text-3xl font-serif font-semibold tracking-tight text-center text-foreground">
-              TheoWrestle
-            </h1>
-            <p className="text-sm text-muted-foreground text-center max-w-sm mt-2">
-              A reflective space for your theological wrestling. Sign in to begin documenting your spiritual journey.
-            </p>
-          </div>
-          <Button
-            onClick={() => {
-              window.location.href = getLoginUrl();
-            }}
-            size="lg"
-            className="w-full shadow-lg hover:shadow-xl transition-all"
-          >
-            Sign in to continue
-          </Button>
-        </div>
-      </div>
-    );
+    return <AuthPage onSuccess={() => refresh()} />;
   }
 
   return (
