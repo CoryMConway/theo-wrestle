@@ -64,7 +64,7 @@ export default function DashboardLayout({
   }
 
   if (!user) {
-    return <AuthPage onSuccess={() => refresh()} />;
+    return <AuthPage />;
   }
 
   return (

@@ -6,21 +6,18 @@ import { toast } from "sonner";
 
 type AuthMode = "login" | "register";
 
-export default function AuthPage({
-  onSuccess,
-}: {
-  onSuccess: () => void;
-}) {
+export default function AuthPage() {
   const [mode, setMode] = useState<AuthMode>("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const utils = trpc.useUtils();
 
   const loginMutation = trpc.auth.login.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Signed in successfully");
-      onSuccess();
+      await utils.auth.me.invalidate();
     },
     onError: (err) => {
       setError(err.message);
@@ -28,9 +25,9 @@ export default function AuthPage({
   });
 
   const registerMutation = trpc.auth.register.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Account created! You're now signed in.");
-      onSuccess();
+      await utils.auth.me.invalidate();
     },
     onError: (err) => {
       setError(err.message);
