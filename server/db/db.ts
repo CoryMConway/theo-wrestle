@@ -1,5 +1,6 @@
-import { eq, desc, and, asc } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { eq, desc, and, asc, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import Database from "better-sqlite3";
 import {
   InsertUser,
   User,
@@ -15,61 +16,106 @@ import { ENV } from "../env.js";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
-// ─── Local In-Memory DB ──────────────────────────────────────────────
-// Used automatically when DATABASE_URL is not set (local development)
+// ─── SQLite Connection ───────────────────────────────────────────────
 
-let _memoryModeLogged = false;
-let mockUserIdCounter = 1;
-let mockJournalEntryIdCounter = 1;
-let mockProgressionSummaryIdCounter = 1;
-
-let mockUsers: User[] = [];
-let mockJournalEntries: JournalEntry[] = [];
-let mockProgressionSummaries: ProgressionSummary[] = [];
-
-function logMemoryMode() {
-  if (!_memoryModeLogged) {
-    console.warn(
-      "[Database] No DATABASE_URL set — running with in-memory DB (data will not persist across restarts)"
+function createTables(sqlite: Database.Database) {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      openId TEXT NOT NULL UNIQUE,
+      name TEXT,
+      email TEXT,
+      loginMethod TEXT,
+      role TEXT NOT NULL DEFAULT 'user',
+      createdAt INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL,
+      lastSignedIn INTEGER NOT NULL
     );
-    _memoryModeLogged = true;
+
+    CREATE TABLE IF NOT EXISTS journal_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      title TEXT,
+      aiSummary TEXT,
+      aiTags TEXT,
+      aiStatus TEXT NOT NULL DEFAULT 'pending',
+      createdAtMs INTEGER NOT NULL,
+      updatedAtMs INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS progression_summaries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      summary TEXT NOT NULL,
+      entriesAnalyzed INTEGER NOT NULL,
+      keyThemes TEXT,
+      createdAtMs INTEGER NOT NULL
+    );
+  `);
+}
+
+export function getDb() {
+  if (!_db) {
+    const dbPath = ENV.sqlitePath;
+    console.log(`[Database] Opening SQLite database at: ${dbPath}`);
+    const sqlite = new Database(dbPath);
+    sqlite.pragma("journal_mode = WAL");
+    sqlite.pragma("foreign_keys = ON");
+    createTables(sqlite);
+    _db = drizzle(sqlite);
   }
+  return _db;
 }
 
-/** Reset all in-memory data. Useful for tests. */
-export function resetMockDb() {
-  mockUserIdCounter = 1;
-  mockJournalEntryIdCounter = 1;
-  mockProgressionSummaryIdCounter = 1;
-  mockUsers = [];
-  mockJournalEntries = [];
-  mockProgressionSummaries = [];
-}
+/** Seed the database with a dev user and sample entries if empty. */
+export function seedDb(userOpenId: string = "dev-user") {
+  const db = getDb();
 
-/** Seed the in-memory DB with sample data for local development. */
-export function seedMockDb(userOpenId: string = "dev-user") {
-  resetMockDb();
+  // Check if user already exists
+  const existing = db
+    .select()
+    .from(users)
+    .where(eq(users.openId, userOpenId))
+    .limit(1)
+    .get();
 
-  const now = Date.now();
-  const userId = mockUserIdCounter++;
+  if (existing) {
+    console.log(`[Database] Dev user already exists, skipping seed`);
+    return;
+  }
 
-  mockUsers.push({
-    id: userId,
-    openId: userOpenId,
-    name: "Dev User",
-    email: "dev@theowrestle.local",
-    loginMethod: "local",
-    role: "admin",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    lastSignedIn: new Date(),
-  });
+  const now = new Date();
+  const nowMs = Date.now();
+
+  // Create dev user
+  db.insert(users)
+    .values({
+      openId: userOpenId,
+      name: "Dev User",
+      email: "dev@theowrestle.local",
+      loginMethod: "local",
+      role: "admin",
+      createdAt: now,
+      updatedAt: now,
+      lastSignedIn: now,
+    })
+    .run();
+
+  const user = db
+    .select()
+    .from(users)
+    .where(eq(users.openId, userOpenId))
+    .limit(1)
+    .get();
+
+  if (!user) return;
 
   const sampleEntries = [
     {
       title: "Wrestling with the Problem of Evil",
       content:
-        "Today I spent time thinking about how the existence of suffering challenges traditional theistic arguments...",
+        "Today I spent time thinking about how the existence of suffering challenges traditional theistic arguments. The classic formulation — if God is omnipotent, omniscient, and omnibenevolent, why does evil exist? — feels different when you're actually sitting with someone who's suffering versus debating it in the abstract...",
       aiSummary:
         "Explores the problem of evil through the lens of the free will defense, noting its limitations regarding natural evil.",
       aiTags: JSON.stringify([
@@ -83,9 +129,9 @@ export function seedMockDb(userOpenId: string = "dev-user") {
     {
       title: "Faith and Reason",
       content:
-        "Reading Aquinas on the relationship between faith and reason...",
+        "Reading Aquinas on the relationship between faith and reason. His five ways are fascinating — the argument from motion, efficient cause, necessity, gradation, and design. What strikes me is how he saw these not as proofs that bypass faith, but as preambles to faith...",
       aiSummary:
-        "Reflection on Aquinas's view that faith and reason are complementary.",
+        "Reflection on Aquinas's view that faith and reason are complementary, focusing on the Five Ways as preambles to faith rather than replacements for it.",
       aiTags: JSON.stringify([
         "Aquinas",
         "faith and reason",
@@ -96,7 +142,7 @@ export function seedMockDb(userOpenId: string = "dev-user") {
     {
       title: "What does grace actually mean?",
       content:
-        "Brain dump: I keep hearing 'grace' thrown around but what does it actually mean in different traditions?",
+        "Brain dump: I keep hearing 'grace' thrown around but what does it actually mean in different traditions? Reformed theology emphasizes irresistible grace, Catholics talk about infused grace, and Wesleyans have prevenient grace...",
       aiSummary: null,
       aiTags: null,
       aiStatus: "pending" as const,
@@ -104,146 +150,82 @@ export function seedMockDb(userOpenId: string = "dev-user") {
   ];
 
   sampleEntries.forEach((entry, i) => {
-    const createdAt = now - (sampleEntries.length - i) * 86400000;
-    mockJournalEntries.push({
-      id: mockJournalEntryIdCounter++,
-      userId,
-      content: entry.content,
-      title: entry.title,
-      aiSummary: entry.aiSummary,
-      aiTags: entry.aiTags,
-      aiStatus: entry.aiStatus,
-      createdAtMs: createdAt,
-      updatedAtMs: createdAt,
-    });
+    const createdAt = nowMs - (sampleEntries.length - i) * 86400000;
+    db.insert(journalEntries)
+      .values({
+        userId: user.id,
+        content: entry.content,
+        title: entry.title,
+        aiSummary: entry.aiSummary,
+        aiTags: entry.aiTags,
+        aiStatus: entry.aiStatus,
+        createdAtMs: createdAt,
+        updatedAtMs: createdAt,
+      })
+      .run();
   });
 
   console.log(
-    `[Database] Seeded in-memory DB with ${sampleEntries.length} sample journal entries`
+    `[Database] Seeded DB with dev user and ${sampleEntries.length} sample entries`
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────
-
-export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
-    try {
-      _db = drizzle(process.env.DATABASE_URL);
-    } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
-      _db = null;
-    }
-  }
-  return _db;
-}
+// ─── User Helpers ────────────────────────────────────────────────────
 
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) {
     throw new Error("User openId is required for upsert");
   }
 
-  const db = await getDb();
-  if (!db) {
-    logMemoryMode();
-    const existingIndex = mockUsers.findIndex((u) => u.openId === user.openId);
-    if (existingIndex !== -1) {
-      const existing = mockUsers[existingIndex];
-      mockUsers[existingIndex] = {
-        ...existing,
-        name: user.name !== undefined ? (user.name ?? null) : existing.name,
-        email: user.email !== undefined ? (user.email ?? null) : existing.email,
-        loginMethod:
-          user.loginMethod !== undefined
-            ? (user.loginMethod ?? null)
-            : existing.loginMethod,
-        role:
-          user.role !== undefined
-            ? user.role
-            : user.openId === ENV.ownerOpenId
-              ? "admin"
-              : existing.role,
-        lastSignedIn: user.lastSignedIn ?? new Date(),
-        updatedAt: new Date(),
-      } as User;
-    } else {
-      mockUsers.push({
-        id: mockUserIdCounter++,
-        openId: user.openId,
-        name: user.name ?? null,
-        email: user.email ?? null,
-        loginMethod: user.loginMethod ?? null,
-        role:
-          user.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "user"),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        lastSignedIn: user.lastSignedIn ?? new Date(),
-      });
-    }
-    return;
+  const db = getDb();
+
+  const updateSet: Record<string, unknown> = {};
+
+  if (user.name !== undefined) updateSet.name = user.name ?? null;
+  if (user.email !== undefined) updateSet.email = user.email ?? null;
+  if (user.loginMethod !== undefined)
+    updateSet.loginMethod = user.loginMethod ?? null;
+  if (user.lastSignedIn !== undefined)
+    updateSet.lastSignedIn = user.lastSignedIn;
+  if (user.role !== undefined) {
+    updateSet.role = user.role;
+  } else if (user.openId === ENV.ownerOpenId) {
+    updateSet.role = "admin";
   }
 
-  try {
-    const values: InsertUser = { openId: user.openId };
-    const updateSet: Record<string, unknown> = {};
+  updateSet.updatedAt = new Date();
 
-    const textFields = ["name", "email", "loginMethod"] as const;
-    type TextField = (typeof textFields)[number];
+  if (!user.lastSignedIn) {
+    user.lastSignedIn = new Date();
+  }
 
-    const assignNullable = (field: TextField) => {
-      const value = user[field];
-      if (value === undefined) return;
-      const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
-    };
-
-    textFields.forEach(assignNullable);
-
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = "admin";
-      updateSet.role = "admin";
-    }
-
-    if (!values.lastSignedIn) {
-      values.lastSignedIn = new Date();
-    }
-
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
-    }
-
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+  db.insert(users)
+    .values({
+      openId: user.openId,
+      name: user.name ?? null,
+      email: user.email ?? null,
+      loginMethod: user.loginMethod ?? null,
+      role:
+        user.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "user"),
+      lastSignedIn: user.lastSignedIn ?? new Date(),
+    })
+    .onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
-    });
-  } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
-    throw error;
-  }
+    })
+    .run();
 }
 
 export async function getUserByOpenId(
   openId: string
 ): Promise<User | undefined> {
-  const db = await getDb();
-  if (!db) {
-    logMemoryMode();
-    return mockUsers.find((u) => u.openId === openId);
-  }
-
-  const result = await db
+  const db = getDb();
+  return db
     .select()
     .from(users)
     .where(eq(users.openId, openId))
-    .limit(1);
-
-  return result.length > 0 ? result[0] : undefined;
+    .limit(1)
+    .get();
 }
 
 // ─── Journal Entry Helpers ───────────────────────────────────────────
@@ -251,69 +233,45 @@ export async function getUserByOpenId(
 export async function createJournalEntry(
   entry: InsertJournalEntry
 ): Promise<number> {
-  const db = await getDb();
-  if (!db) {
-    logMemoryMode();
-    const newId = mockJournalEntryIdCounter++;
-    mockJournalEntries.push({
-      id: newId,
-      userId: entry.userId,
-      content: entry.content,
-      title: entry.title ?? null,
-      aiSummary: entry.aiSummary ?? null,
-      aiTags: entry.aiTags ?? null,
-      aiStatus: entry.aiStatus ?? "pending",
-      createdAtMs: entry.createdAtMs ?? Date.now(),
-      updatedAtMs: entry.updatedAtMs ?? Date.now(),
-    });
-    return newId;
-  }
-
-  const result = await db.insert(journalEntries).values(entry);
-  return result[0].insertId;
+  const db = getDb();
+  const result = db.insert(journalEntries).values({
+    userId: entry.userId,
+    content: entry.content,
+    title: entry.title ?? null,
+    aiSummary: entry.aiSummary ?? null,
+    aiTags: entry.aiTags ?? null,
+    aiStatus: entry.aiStatus ?? "pending",
+    createdAtMs: entry.createdAtMs ?? Date.now(),
+    updatedAtMs: entry.updatedAtMs ?? Date.now(),
+  }).run();
+  return Number(result.lastInsertRowid);
 }
 
 export async function getJournalEntriesByUser(
   userId: number,
   order: "asc" | "desc" = "desc"
 ): Promise<JournalEntry[]> {
-  const db = await getDb();
-  if (!db) {
-    logMemoryMode();
-    const entries = mockJournalEntries.filter((e) => e.userId === userId);
-    entries.sort((a, b) =>
-      order === "asc"
-        ? a.createdAtMs - b.createdAtMs
-        : b.createdAtMs - a.createdAtMs
-    );
-    return entries;
-  }
-
+  const db = getDb();
   const orderFn = order === "asc" ? asc : desc;
   return db
     .select()
     .from(journalEntries)
     .where(eq(journalEntries.userId, userId))
-    .orderBy(orderFn(journalEntries.createdAtMs));
+    .orderBy(orderFn(journalEntries.createdAtMs))
+    .all();
 }
 
 export async function getJournalEntryById(
   id: number,
   userId: number
 ): Promise<JournalEntry | undefined> {
-  const db = await getDb();
-  if (!db) {
-    logMemoryMode();
-    return mockJournalEntries.find((e) => e.id === id && e.userId === userId);
-  }
-
-  const result = await db
+  const db = getDb();
+  return db
     .select()
     .from(journalEntries)
     .where(and(eq(journalEntries.id, id), eq(journalEntries.userId, userId)))
-    .limit(1);
-
-  return result[0];
+    .limit(1)
+    .get();
 }
 
 export async function updateJournalEntry(
@@ -331,61 +289,31 @@ export async function updateJournalEntry(
     >
   >
 ): Promise<void> {
-  const db = await getDb();
-  if (!db) {
-    logMemoryMode();
-    const index = mockJournalEntries.findIndex(
-      (e) => e.id === id && e.userId === userId
-    );
-    if (index !== -1) {
-      mockJournalEntries[index] = {
-        ...mockJournalEntries[index],
-        ...updates,
-      };
-    }
-    return;
-  }
-
-  await db
-    .update(journalEntries)
+  const db = getDb();
+  db.update(journalEntries)
     .set(updates)
-    .where(and(eq(journalEntries.id, id), eq(journalEntries.userId, userId)));
+    .where(and(eq(journalEntries.id, id), eq(journalEntries.userId, userId)))
+    .run();
 }
 
 export async function deleteJournalEntry(
   id: number,
   userId: number
 ): Promise<void> {
-  const db = await getDb();
-  if (!db) {
-    logMemoryMode();
-    const index = mockJournalEntries.findIndex(
-      (e) => e.id === id && e.userId === userId
-    );
-    if (index !== -1) {
-      mockJournalEntries.splice(index, 1);
-    }
-    return;
-  }
-
-  await db
-    .delete(journalEntries)
-    .where(and(eq(journalEntries.id, id), eq(journalEntries.userId, userId)));
+  const db = getDb();
+  db.delete(journalEntries)
+    .where(and(eq(journalEntries.id, id), eq(journalEntries.userId, userId)))
+    .run();
 }
 
 export async function getJournalEntryCount(userId: number): Promise<number> {
-  const db = await getDb();
-  if (!db) {
-    logMemoryMode();
-    return mockJournalEntries.filter((e) => e.userId === userId).length;
-  }
-
-  const result = await db
-    .select()
+  const db = getDb();
+  const result = db
+    .select({ count: sql<number>`count(*)` })
     .from(journalEntries)
-    .where(eq(journalEntries.userId, userId));
-
-  return result.length;
+    .where(eq(journalEntries.userId, userId))
+    .get();
+  return result?.count ?? 0;
 }
 
 // ─── Progression Summary Helpers ─────────────────────────────────────
@@ -393,65 +321,39 @@ export async function getJournalEntryCount(userId: number): Promise<number> {
 export async function createProgressionSummary(
   summary: InsertProgressionSummary
 ): Promise<number> {
-  const db = await getDb();
-  if (!db) {
-    logMemoryMode();
-    const newId = mockProgressionSummaryIdCounter++;
-    mockProgressionSummaries.push({
-      id: newId,
-      userId: summary.userId,
-      summary: summary.summary,
-      entriesAnalyzed: summary.entriesAnalyzed,
-      keyThemes: summary.keyThemes ?? null,
-      createdAtMs: summary.createdAtMs ?? Date.now(),
-    });
-    return newId;
-  }
-
-  const result = await db.insert(progressionSummaries).values(summary);
-  return result[0].insertId;
+  const db = getDb();
+  const result = db.insert(progressionSummaries).values({
+    userId: summary.userId,
+    summary: summary.summary,
+    entriesAnalyzed: summary.entriesAnalyzed,
+    keyThemes: summary.keyThemes ?? null,
+    createdAtMs: summary.createdAtMs ?? Date.now(),
+  }).run();
+  return Number(result.lastInsertRowid);
 }
 
 export async function getLatestProgressionSummary(
   userId: number
 ): Promise<ProgressionSummary | null> {
-  const db = await getDb();
-  if (!db) {
-    logMemoryMode();
-    const userSummaries = mockProgressionSummaries.filter(
-      (s) => s.userId === userId
-    );
-    if (userSummaries.length === 0) return null;
-    userSummaries.sort((a, b) => b.createdAtMs - a.createdAtMs);
-    return userSummaries[0];
-  }
-
-  const result = await db
+  const db = getDb();
+  const result = db
     .select()
     .from(progressionSummaries)
     .where(eq(progressionSummaries.userId, userId))
     .orderBy(desc(progressionSummaries.createdAtMs))
-    .limit(1);
-
-  return result[0] ?? null;
+    .limit(1)
+    .get();
+  return result ?? null;
 }
 
 export async function getProgressionSummaries(
   userId: number
 ): Promise<ProgressionSummary[]> {
-  const db = await getDb();
-  if (!db) {
-    logMemoryMode();
-    const userSummaries = mockProgressionSummaries.filter(
-      (s) => s.userId === userId
-    );
-    userSummaries.sort((a, b) => b.createdAtMs - a.createdAtMs);
-    return userSummaries;
-  }
-
+  const db = getDb();
   return db
     .select()
     .from(progressionSummaries)
     .where(eq(progressionSummaries.userId, userId))
-    .orderBy(desc(progressionSummaries.createdAtMs));
+    .orderBy(desc(progressionSummaries.createdAtMs))
+    .all();
 }

@@ -3,6 +3,15 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context.js";
 
+/*
+    superjson - deserializes in a way that preserves types like Date, RegExp, Map, Set, unlike JSON.parse()
+    
+    publicProcedure - no auth needed
+    protectedProcedure - requires logged-in user
+    adminProcedure - requires admin role
+
+*/
+
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
 });

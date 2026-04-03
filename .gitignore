@@ -17,3 +17,8 @@ logs/
 
 # Miscellaneous
 .DS_Store
+
+# SQLite database files
+*.db
+*.db-wal
+*.db-shm

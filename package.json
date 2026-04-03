@@ -21,6 +21,7 @@
     "@trpc/client": "^11.0.0-rc.680",
     "@trpc/react-query": "^11.0.0-rc.680",
     "@trpc/server": "^11.0.0-rc.680",
+    "better-sqlite3": "^12.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cookie-parser": "^1.4.7",
@@ -29,7 +30,6 @@
     "express": "^4.21.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.468.0",
-    "mysql2": "^3.11.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sonner": "^1.7.1",
@@ -42,6 +42,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/cookie-parser": "^1.4.8",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",

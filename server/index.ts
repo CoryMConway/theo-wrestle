@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "./routers.js";
 import { ENV } from "./env.js";
-import { getUserByOpenId, upsertUser, seedMockDb } from "./db/db.js";
+import { getUserByOpenId, upsertUser, seedDb } from "./db/db.js";
 import { COOKIE_NAME } from "../shared/const.js";
 import jwt from "jsonwebtoken";
 import type { TrpcContext } from "./context.js";
@@ -25,7 +25,7 @@ app.use(express.json());
 const DEV_USER_OPEN_ID = "dev-user";
 
 if (ENV.isDemoMode) {
-  seedMockDb(DEV_USER_OPEN_ID);
+  seedDb(DEV_USER_OPEN_ID);
 }
 
 // ─── Auth Middleware Helper ──────────────────────────────────────────
@@ -109,7 +109,7 @@ const port = ENV.port;
 app.listen(port, () => {
   console.log(`[Server] TheoWrestle running on http://localhost:${port}`);
   if (ENV.isDemoMode) {
-    console.log(`[Server] Demo mode — in-memory DB, auto-login enabled`);
+    console.log(`[Server] Demo mode — SQLite DB, auto-login enabled`);
   }
   if (!ENV.isProduction) {
     console.log(`[Server] Client dev server at http://localhost:5173`);
