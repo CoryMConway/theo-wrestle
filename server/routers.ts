@@ -1,7 +1,6 @@
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
-import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { COOKIE_NAME } from "../shared/const.js";
+import { getSessionCookieOptions } from "./lib/cookies.js";
+import { publicProcedure, protectedProcedure, router } from "./trpc.js";
 import { z } from "zod";
 import {
   createJournalEntry,
@@ -13,14 +12,13 @@ import {
   createProgressionSummary,
   getLatestProgressionSummary,
   getProgressionSummaries,
-} from "./db";
-import { invokeLLM } from "./_core/llm";
+} from "./db/db.js";
+import { invokeLLM } from "./lib/llm.js";
 import { TRPCError } from "@trpc/server";
 
 export const appRouter = router({
-  system: systemRouter,
   auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
+    me: publicProcedure.query((opts) => opts.ctx.user ?? null),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -50,7 +48,7 @@ export const appRouter = router({
           updatedAtMs: now,
         });
 
-        // Trigger AI summarization in the background (don't block response)
+        // Trigger AI summarization in the background
         summarizeEntry(entryId, ctx.user.id, input.content).catch((err) =>
           console.error("[AI] Failed to summarize entry:", err)
         );
@@ -74,7 +72,7 @@ export const appRouter = router({
         );
         return entries.map((e) => ({
           ...e,
-          aiTags: e.aiTags ? JSON.parse(e.aiTags) as string[] : [],
+          aiTags: e.aiTags ? (JSON.parse(e.aiTags) as string[]) : [],
         }));
       }),
 
@@ -91,7 +89,7 @@ export const appRouter = router({
         }
         return {
           ...entry,
-          aiTags: entry.aiTags ? JSON.parse(entry.aiTags) as string[] : [],
+          aiTags: entry.aiTags ? (JSON.parse(entry.aiTags) as string[]) : [],
         };
       }),
 
@@ -121,7 +119,6 @@ export const appRouter = router({
 
         await updateJournalEntry(input.id, ctx.user.id, updates as any);
 
-        // Re-summarize if content changed
         if (input.content && input.content !== existing.content) {
           await updateJournalEntry(input.id, ctx.user.id, {
             aiStatus: "pending",
@@ -145,7 +142,7 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    /** Manually re-trigger AI summarization for an entry */
+    /** Manually re-trigger AI summarization */
     resummarize: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
@@ -168,7 +165,7 @@ export const appRouter = router({
   }),
 
   progression: router({
-    /** Generate a new progression summary analyzing all entries */
+    /** Generate a new progression summary */
     generate: protectedProcedure.mutation(async ({ ctx }) => {
       const entries = await getJournalEntriesByUser(ctx.user.id, "asc");
 
@@ -182,7 +179,6 @@ export const appRouter = router({
 
       const progressionText = await generateProgressionAnalysis(entries);
 
-      // Extract key themes
       let keyThemes: string[] = [];
       try {
         const themesResult = await invokeLLM({
@@ -250,7 +246,6 @@ export const appRouter = router({
       const entryCount = entries.length;
       const latestSummary = await getLatestProgressionSummary(ctx.user.id);
 
-      // Collect all unique tags
       const allTags = new Set<string>();
       entries.forEach((e) => {
         if (e.aiTags) {
@@ -292,25 +287,17 @@ async function summarizeEntry(
       messages: [
         {
           role: "system",
-          content: `You are a thoughtful theological companion helping someone process their spiritual wrestling. Your role is to:
-1. Summarize the key theological questions, tensions, and insights in 2-4 sentences.
-2. Identify the core themes being wrestled with.
-3. Be respectful, non-judgmental, and encouraging of honest theological exploration.
-4. Use language that honors the depth of the reflection without being preachy.
+          content: `You are a thoughtful theological companion. Summarize the key theological questions, tensions, and insights in 2-4 sentences and identify core themes.
 
-Respond in JSON format with this structure:
+Respond in JSON format:
 {
-  "summary": "A 2-4 sentence summary of the theological wrestling...",
+  "summary": "A 2-4 sentence summary...",
   "tags": ["theme1", "theme2", "theme3"]
 }
 
-The tags should be concise theological themes (e.g., "grace vs. works", "divine sovereignty", "problem of suffering", "nature of prayer").
 Only return valid JSON, nothing else.`,
         },
-        {
-          role: "user",
-          content: content,
-        },
+        { role: "user", content },
       ],
     });
 
@@ -319,11 +306,9 @@ Only return valid JSON, nothing else.`,
       throw new Error("Unexpected LLM response format");
     }
 
-    // Try to parse JSON from the response
     let summary = "";
     let tags: string[] = [];
     try {
-      // Handle potential markdown code blocks in response
       const cleaned = responseContent
         .replace(/```json\n?/g, "")
         .replace(/```\n?/g, "")
@@ -332,7 +317,6 @@ Only return valid JSON, nothing else.`,
       summary = parsed.summary || "";
       tags = Array.isArray(parsed.tags) ? parsed.tags : [];
     } catch {
-      // If JSON parsing fails, use the raw text as summary
       summary = responseContent;
       tags = [];
     }
@@ -361,7 +345,6 @@ async function generateProgressionAnalysis(
     title: string | null;
   }>
 ): Promise<string> {
-  // Build a chronological timeline of entries for the LLM
   const timeline = entries
     .map((e, i) => {
       const date = new Date(e.createdAtMs).toLocaleDateString("en-US", {
@@ -370,11 +353,10 @@ async function generateProgressionAnalysis(
         day: "numeric",
       });
       const title = e.title ? `"${e.title}"` : `Entry ${i + 1}`;
-      const tags = e.aiTags ? JSON.parse(e.aiTags).join(", ") : "no themes extracted";
-      return `--- ${title} (${date}) ---
-Themes: ${tags}
-Summary: ${e.aiSummary || "No summary available"}
-Content excerpt: ${e.content.substring(0, 500)}${e.content.length > 500 ? "..." : ""}`;
+      const tags = e.aiTags
+        ? JSON.parse(e.aiTags).join(", ")
+        : "no themes extracted";
+      return `--- ${title} (${date}) ---\nThemes: ${tags}\nSummary: ${e.aiSummary || "No summary available"}\nContent excerpt: ${e.content.substring(0, 500)}${e.content.length > 500 ? "..." : ""}`;
     })
     .join("\n\n");
 
@@ -382,23 +364,11 @@ Content excerpt: ${e.content.substring(0, 500)}${e.content.length > 500 ? "..." 
     messages: [
       {
         role: "system",
-        content: `You are a wise and empathetic theological companion analyzing someone's spiritual journey over time. You have access to their chronological journal entries about their theological wrestling.
-
-Your task is to write a thoughtful progression analysis that:
-
-1. **Traces the arc of their theological thinking** - How have their questions, doubts, and convictions evolved?
-2. **Identifies patterns and growth** - What themes keep recurring? Where do you see deepening understanding?
-3. **Notes significant shifts** - Are there moments where their thinking clearly changed direction?
-4. **Highlights tensions they're holding** - What unresolved questions are they still wrestling with?
-5. **Offers encouragement** - Affirm the value of honest theological wrestling without being patronizing.
-
-Write in a warm, thoughtful tone. Use second person ("you"). Structure your response with clear sections using markdown headers. Be specific - reference their actual themes and ideas, don't be generic.
-
-Keep the analysis between 400-800 words.`,
+        content: `You are a wise theological companion analyzing someone's spiritual journey. Write a thoughtful progression analysis (400-800 words) that traces the arc of their theological thinking, identifies patterns and growth, notes significant shifts, highlights tensions, and offers encouragement. Use markdown headers and second person ("you").`,
       },
       {
         role: "user",
-        content: `Here is the chronological timeline of theological journal entries to analyze:\n\n${timeline}`,
+        content: `Here is the chronological timeline of theological journal entries:\n\n${timeline}`,
       },
     ],
   });

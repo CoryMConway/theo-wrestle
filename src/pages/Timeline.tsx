@@ -9,7 +9,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { trpc } from "../lib/trpc";
+import { trpc } from "@/lib/trpc-client";
 import {
   AlertCircle,
   BookOpen,

@@ -1,7 +1,7 @@
 import { useAuth } from "../hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { trpc } from "../lib/trpc";
+import { trpc } from "@/lib/trpc-client";
 import { BookOpen, Clock, PenLine, Send, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
