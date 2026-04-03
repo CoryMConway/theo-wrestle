@@ -1,17 +1,15 @@
----
-title: TheoWrestle
-emoji: 📖
-colorFrom: indigo
-colorTo: purple
-sdk: docker
-app_port: 7860
----
-
 # TheoWrestle
 
 **Wrestle with theology. Let AI help you see the bigger picture.**
 
 TheoWrestle is a journaling app for anyone exploring theology — whether you're working through tough questions, processing sermons, studying scripture, or just thinking out loud about faith. Write freely, and AI will summarize your entries, extract themes, and analyze how your thinking evolves over time.
+
+<img width="1693" height="1026" alt="Screenshot 2026-04-03 at 3 42 24 PM" src="https://github.com/user-attachments/assets/3d9cc851-bc4b-40d9-a359-88516238469e" />
+
+<img width="1693" height="1026" alt="Screenshot 2026-04-03 at 3 44 44 PM" src="https://github.com/user-attachments/assets/ee482757-4a72-40c8-a86b-c7554184ba55" />
+
+<img width="1693" height="1026" alt="Screenshot 2026-04-03 at 3 45 30 PM" src="https://github.com/user-attachments/assets/63faddd5-3ea4-4827-89dd-fcede6bacdfc" />
+
 
 ## Try It
 
