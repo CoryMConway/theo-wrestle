@@ -24,7 +24,7 @@ app.use(express.json());
 // In development without OAuth, auto-create a dev user session
 const DEV_USER_OPEN_ID = "dev-user";
 
-if (!ENV.isProduction && !ENV.databaseUrl) {
+if (ENV.isDemoMode) {
   seedMockDb(DEV_USER_OPEN_ID);
 }
 
@@ -34,8 +34,8 @@ async function getUserFromRequest(
 ): Promise<TrpcContext["user"]> {
   const token = req.cookies?.[COOKIE_NAME];
 
-  // Dev mode: auto-sign in
-  if (!ENV.isProduction && !token) {
+  // Demo/dev mode: auto-sign in
+  if (ENV.isDemoMode && !token) {
     const user = await getUserByOpenId(DEV_USER_OPEN_ID);
     return user ?? null;
   }
@@ -54,8 +54,8 @@ async function getUserFromRequest(
 }
 
 // ─── Dev Login Route ─────────────────────────────────────────────────
-app.post("/api/dev-login", async (req, res) => {
-  if (ENV.isProduction) {
+app.get("/api/dev-login", async (req, res) => {
+  if (!ENV.isDemoMode) {
     return res.status(404).json({ error: "Not found" });
   }
 
@@ -74,13 +74,13 @@ app.post("/api/dev-login", async (req, res) => {
 
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: false,
+    secure: ENV.isProduction,
     sameSite: "lax",
     path: "/",
     maxAge: 1000 * 60 * 60 * 24 * 365,
   });
 
-  return res.json({ success: true });
+  return res.redirect("/");
 });
 
 // ─── tRPC ────────────────────────────────────────────────────────────
@@ -108,8 +108,10 @@ if (ENV.isProduction) {
 const port = ENV.port;
 app.listen(port, () => {
   console.log(`[Server] TheoWrestle running on http://localhost:${port}`);
+  if (ENV.isDemoMode) {
+    console.log(`[Server] Demo mode — in-memory DB, auto-login enabled`);
+  }
   if (!ENV.isProduction) {
-    console.log(`[Server] Dev mode — auto-login enabled, no OAuth required`);
     console.log(`[Server] Client dev server at http://localhost:5173`);
   }
 });
