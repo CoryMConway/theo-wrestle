@@ -6,9 +6,9 @@ TheoWrestle is a journaling app for anyone exploring theology — whether you're
 
 <img width="1693" height="1026" alt="Screenshot 2026-04-03 at 3 42 24 PM" src="https://github.com/user-attachments/assets/3d9cc851-bc4b-40d9-a359-88516238469e" />
 
-<img width="1693" height="1026" alt="Screenshot 2026-04-03 at 3 44 44 PM" src="https://github.com/user-attachments/assets/ee482757-4a72-40c8-a86b-c7554184ba55" />
+<img width="1693" height="1026" alt="Screenshot 2026-04-03 at 6 43 53 PM" src="https://github.com/user-attachments/assets/28d8cd60-91a7-49db-97eb-c52105112149" />
 
-<img width="1693" height="1026" alt="Screenshot 2026-04-03 at 3 45 30 PM" src="https://github.com/user-attachments/assets/63faddd5-3ea4-4827-89dd-fcede6bacdfc" />
+<img width="1693" height="1026" alt="Screenshot 2026-04-03 at 6 42 38 PM" src="https://github.com/user-attachments/assets/5f00fb65-86f7-4c57-919d-b1cd7b198953" />
 
 
 ## Try It
