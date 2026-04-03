@@ -97,7 +97,7 @@ app.use(
 
 // ─── Static Files (Production) ──────────────────────────────────────
 if (ENV.isProduction) {
-  const clientDir = path.join(__dirname, "../client");
+  const clientDir = path.join(__dirname, "../../client");
   app.use(express.static(clientDir));
   app.get("*", (_req, res) => {
     res.sendFile(path.join(clientDir, "index.html"));

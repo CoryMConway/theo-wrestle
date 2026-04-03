@@ -1,3 +1,12 @@
+---
+title: TheoWrestle
+emoji: 📖
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 7860
+---
+
 # TheoWrestle
 
 TheoWrestle is a theological journaling application that leverages AI to analyze and summarize user entries. It provides insights into theological growth over time.
