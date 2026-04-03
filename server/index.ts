@@ -16,6 +16,9 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// Trust HuggingFace's reverse proxy (correct req.protocol, req.ip, etc.)
+app.set("trust proxy", 1);
+
 app.use(cors({ origin: true, credentials: true }));
 app.use(cookieParser());
 app.use(express.json());

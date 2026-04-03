@@ -109,8 +109,8 @@ export const appRouter = router({
         const user = await getUserByUsername(input.username);
         if (!user || !user.passwordHash) {
           throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Invalid username or password",
+            code: "NOT_FOUND",
+            message: "No account found with that username. Please sign up first.",
           });
         }
 
@@ -118,7 +118,7 @@ export const appRouter = router({
         if (!valid) {
           throw new TRPCError({
             code: "UNAUTHORIZED",
-            message: "Invalid username or password",
+            message: "Incorrect password",
           });
         }
 
