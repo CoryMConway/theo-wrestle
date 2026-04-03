@@ -5,7 +5,7 @@ export const UNAUTHED_ERR_MSG = "Please login (10001)";
 export const NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
 
 export function getLoginUrl() {
-  // Always use dev-login — in demo mode (no real OAuth) the server handles it.
-  // When real OAuth is configured, the server returns 404 and we'd redirect to OAuth.
+  // Uses dev-login to create a session cookie via the server.
+  // When real OAuth is configured, this should point to the OAuth flow instead.
   return "/api/dev-login";
 }

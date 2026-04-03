@@ -34,12 +34,6 @@ async function getUserFromRequest(
 ): Promise<TrpcContext["user"]> {
   const token = req.cookies?.[COOKIE_NAME];
 
-  // Demo/dev mode: auto-sign in
-  if (ENV.isDemoMode && !token) {
-    const user = await getUserByOpenId(DEV_USER_OPEN_ID);
-    return user ?? null;
-  }
-
   if (!token) return null;
 
   try {
