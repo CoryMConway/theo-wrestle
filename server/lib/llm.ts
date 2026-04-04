@@ -196,7 +196,9 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const normalizedToolChoice = normalizeToolChoice(toolChoice || tool_choice, tools);
   if (normalizedToolChoice) payload.tool_choice = normalizedToolChoice;
 
-  payload.max_tokens = 8192;
+  // Cap the generated tokens to 4096, as many models on HF have 8k context limits.
+  // Setting it too high (e.g. 8192) will cause a 400 Bad Request error if there's no room for the prompt.
+  payload.max_tokens = 4096;
 
   const normalizedResponseFormat = normalizeResponseFormat({
     responseFormat,
