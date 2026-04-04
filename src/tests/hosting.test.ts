@@ -15,6 +15,12 @@ describe("isOfficialHostedInstance", () => {
     expect(isOfficialHostedInstance("https://example.com")).toBe(false);
   });
 
+  it("returns false for official host with different protocol", () => {
+    expect(isOfficialHostedInstance("http://coryconway-theowrestle.hf.space")).toBe(
+      false
+    );
+  });
+
   it("returns false for invalid URL strings", () => {
     expect(isOfficialHostedInstance("not-a-url")).toBe(false);
   });

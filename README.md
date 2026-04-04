@@ -20,7 +20,7 @@ TheoWrestle is hosted for free at **[coryconway-theowrestle.hf.space](https://co
 If you’re running a community and want your own free deployment:
 
 1. Fork this repo on GitHub.
-2. Go to https://huggingface.co/new-space, choose your SDK, then select **GitHub repository** and paste your fork URL.
+2. Go to https://huggingface.co/new-space, choose the **Docker** SDK, then select **GitHub repository** and paste your fork URL.
 3. Deploy — it will build the same app from your fork.
 
 ### Keep your fork updated

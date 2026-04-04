@@ -1,4 +1,14 @@
 import { BookOpen } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc-client";
 import { useState } from "react";
@@ -6,6 +16,14 @@ import { toast } from "sonner";
 import { isOfficialHostedInstance } from "@/lib/hosting";
 
 type AuthMode = "login" | "register";
+const OFFICIAL_NOTICE_TEXT =
+  "This shared free instance has limited capacity. If you can, please host your own free fork on Hugging Face for your community.";
+const HOST_FIRST_TITLE = "Could you host your own free instance first?";
+const HOST_FIRST_DESCRIPTION =
+  "You're using the official free shared instance. If possible, please host your own free fork on Hugging Face so this project can reach more people.";
+const CANT_HOST_TITLE = "Confirm before creating account";
+const CANT_HOST_DESCRIPTION =
+  "Please confirm: I can't host my own free version on Hugging Face right now.";
 
 export default function AuthPage() {
   const [mode, setMode] = useState<AuthMode>("login");
@@ -13,6 +31,10 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const [confirmationStep, setConfirmationStep] = useState<
+    "host-first" | "cant-host"
+  >("host-first");
   const utils = trpc.useUtils();
 
   const loginMutation = trpc.auth.login.useMutation({
@@ -36,6 +58,10 @@ export default function AuthPage() {
   });
 
   const isLoading = loginMutation.isPending || registerMutation.isPending;
+  const isOfficialHost = isOfficialHostedInstance(window.location.href);
+  const submitRegistration = () => {
+    registerMutation.mutate({ username, password, name });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,24 +70,13 @@ export default function AuthPage() {
     if (mode === "login") {
       loginMutation.mutate({ username, password });
     } else {
-      if (
-        isOfficialHostedInstance(window.location.href) &&
-        !window.confirm(
-          "You're using the official free shared instance. Could you host your own free fork for your community first so this project can reach more people?"
-        )
-      ) {
+      if (isOfficialHost) {
+        setConfirmationStep("host-first");
+        setConfirmationOpen(true);
         return;
       }
 
-      if (
-        !window.confirm(
-          "Please confirm: you can't host your own free version on Hugging Face right now."
-        )
-      ) {
-        return;
-      }
-
-      registerMutation.mutate({ username, password, name });
+      submitRegistration();
     }
   };
 
@@ -91,11 +106,14 @@ export default function AuthPage() {
 
           {mode === "register" && (
             <>
-              {isOfficialHostedInstance(window.location.href) && (
-                <div className="bg-amber-500/10 text-amber-700 text-sm rounded-lg px-4 py-3">
-                  This shared free instance has limited capacity. If you can,
-                  please host your own free fork on Hugging Face for your
-                  community.
+              {isOfficialHost && (
+                <div
+                  role="alert"
+                  aria-live="polite"
+                  className="bg-amber-500/10 text-amber-700 text-sm rounded-lg px-4 py-3"
+                >
+                  <span className="font-semibold">Notice:</span>{" "}
+                  {OFFICIAL_NOTICE_TEXT}
                 </div>
               )}
               <div className="space-y-1.5">
@@ -203,6 +221,51 @@ export default function AuthPage() {
           </p>
         </form>
       </div>
+
+      <AlertDialog
+        open={confirmationOpen}
+        onOpenChange={(open) => {
+          setConfirmationOpen(open);
+          if (!open) {
+            setConfirmationStep("host-first");
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmationStep === "host-first"
+                ? HOST_FIRST_TITLE
+                : CANT_HOST_TITLE}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmationStep === "host-first"
+                ? HOST_FIRST_DESCRIPTION
+                : CANT_HOST_DESCRIPTION}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {confirmationStep === "host-first" ? "I'll host my own" : "Go back"}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                if (confirmationStep === "host-first") {
+                  e.preventDefault();
+                  setConfirmationStep("cant-host");
+                  return;
+                }
+
+                submitRegistration();
+              }}
+            >
+              {confirmationStep === "host-first"
+                ? "I can't host right now"
+                : "Continue to create account"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
