@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import "./styles/index.css";
+import { registerServiceWorker } from "./lib/register-service-worker";
 
 const queryClient = new QueryClient();
 
@@ -31,11 +32,4 @@ createRoot(document.getElementById("root")!).render(
   </trpc.Provider>
 );
 
-// Register service worker for PWA support
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {
-      // SW registration failed — non-critical
-    });
-  });
-}
+registerServiceWorker();

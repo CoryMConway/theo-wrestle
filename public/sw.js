@@ -1,4 +1,4 @@
-const CACHE_NAME = "theowrestle-v1";
+const CACHE_NAME = "theowrestle-v2";
 
 // Install — pre-cache the app shell
 self.addEventListener("install", (event) => {
@@ -22,6 +22,12 @@ self.addEventListener("activate", (event) => {
     )
   );
   self.clients.claim();
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 // Fetch — network-first for API, cache-first for assets
