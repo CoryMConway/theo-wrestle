@@ -17,10 +17,12 @@ import { isOfficialHostedInstance } from "@/lib/hosting";
 
 type AuthMode = "login" | "register";
 const OFFICIAL_NOTICE_TEXT =
-  "This shared free instance has limited capacity. If you can, please host your own free fork on Hugging Face for your community.";
-const HOST_FIRST_TITLE = "Could you host your own free instance first?";
+  "This shared free instance has limited capacity. If you can, please host your own free fork on Hugging Face for your community. See the self-hosting instructions in the ";
+
+const HOST_FIRST_TITLE = "Are you able to host your own free instance first?";
 const HOST_FIRST_DESCRIPTION =
-  "You're using the official free shared instance. If possible, please host your own free fork on Hugging Face so this project can reach more people.";
+  "You're using the official free shared instance. If possible, please host your own free fork on Hugging Face so this project can reach more people. See the self-hosting instructions in the ";
+
 const CANT_HOST_TITLE = "Confirm before creating account";
 const CANT_HOST_DESCRIPTION =
   "Please confirm: I can't host my own free version on Hugging Face right now.";
@@ -114,6 +116,10 @@ export default function AuthPage() {
                 >
                   <span className="font-semibold">Notice:</span>{" "}
                   {OFFICIAL_NOTICE_TEXT}
+                  <a className="text-blue-600 hover:text-blue-400" href='https://github.com/CoryMConway/theo-wrestle/blob/main/README.md' target='_blank' rel='noopener noreferrer'>
+                    <u>README</u>
+                  </a>
+                  {'.'}
                 </div>
               )}
               <div className="space-y-1.5">
@@ -240,7 +246,13 @@ export default function AuthPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmationStep === "host-first"
-                ? HOST_FIRST_DESCRIPTION
+                ? <>
+                    {HOST_FIRST_DESCRIPTION }
+                    <u>
+                      <a className="text-blue-600 hover:text-blue-400" href='https://github.com/CoryMConway/theo-wrestle/blob/main/README.md' target='_blank' rel='noopener noreferrer'>README</a>
+                    </u>
+                    {'.'}
+                  </>
                 : CANT_HOST_DESCRIPTION}
             </AlertDialogDescription>
           </AlertDialogHeader>
