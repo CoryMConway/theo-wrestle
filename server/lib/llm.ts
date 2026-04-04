@@ -146,7 +146,7 @@ const normalizeToolChoice = (
 };
 
 const resolveApiUrl = () =>
-  `https://router.huggingface.co/hf-inference/v1/chat/completions`;
+  `https://router.huggingface.co/v1/chat/completions`;
 
 const assertApiKey = () => {
   if (!ENV.hfToken) {
