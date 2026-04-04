@@ -625,8 +625,39 @@ async function summarizeEntry(
       summary = parsed.summary || "";
       tags = Array.isArray(parsed.tags) ? parsed.tags : [];
     } catch {
-      summary = responseContent;
-      tags = [];
+      // JSON.parse failed — try regex extraction as fallback
+      const summaryMatch = responseContent.match(
+        /["']summary["']\s*:\s*["']([\s\S]*?)["']\s*,\s*["']tags["']/
+      );
+      const tagsMatch = responseContent.match(
+        /["']tags["']\s*:\s*\[([^\]]*)\]/
+      );
+
+      if (summaryMatch) {
+        summary = summaryMatch[1]
+          .replace(/\\n/g, "\n")
+          .replace(/\\"/g, '"')
+          .trim();
+      } else {
+        // Last resort: strip JSON wrapper characters
+        summary = responseContent
+          .replace(/^\s*\{\s*["']summary["']\s*:\s*["']/i, "")
+          .replace(/["']\s*,\s*["']tags["']\s*:\s*\[.*\]\s*\}\s*$/i, "")
+          .replace(/\\n/g, "\n")
+          .replace(/\\"/g, '"')
+          .trim();
+      }
+
+      if (tagsMatch) {
+        try {
+          tags = JSON.parse(`[${tagsMatch[1]}]`);
+        } catch {
+          tags = tagsMatch[1]
+            .split(",")
+            .map((t) => t.trim().replace(/^["']|["']$/g, ""))
+            .filter(Boolean);
+        }
+      }
     }
 
     await updateJournalEntry(entryId, userId, {

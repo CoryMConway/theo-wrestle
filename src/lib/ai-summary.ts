@@ -19,7 +19,28 @@ export function getAiSummaryMarkdown(aiSummary: string | null): string {
       return parsed.summary.trim();
     }
   } catch {
-    // Invalid/non-JSON summary format: fall back to cleaned text.
+    // JSON.parse failed — check if it looks like a JSON wrapper and strip it
+    const summaryMatch = cleaned.match(
+      /["']summary["']\s*:\s*["']([\s\S]*?)["']\s*,\s*["']tags["']/
+    );
+    if (summaryMatch) {
+      return summaryMatch[1]
+        .replace(/\\n/g, "\n")
+        .replace(/\\"/g, '"')
+        .trim();
+    }
+
+    // Strip leading { "summary": " and trailing ", "tags": [...] }
+    const stripped = cleaned
+      .replace(/^\s*\{\s*["']summary["']\s*:\s*["']/i, "")
+      .replace(/["']\s*,\s*["']tags["']\s*:\s*\[.*\]\s*\}\s*$/i, "")
+      .replace(/\\n/g, "\n")
+      .replace(/\\"/g, '"')
+      .trim();
+
+    if (stripped !== cleaned) {
+      return stripped;
+    }
   }
 
   return cleaned;
