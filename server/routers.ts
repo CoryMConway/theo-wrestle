@@ -37,8 +37,8 @@ The summary must use this exact markdown structure:
     - <fact or reasoning point>
     - <fact or reasoning point>
   - **Self-Questions:**
-    - <question the person asked themself>
-    - <question the person asked themself>
+    - <question the person asked themselves>
+    - <question the person asked themselves>
 
 Repeat the topic block for each major topic found. If a section has no clear content, write "None noted".
 
