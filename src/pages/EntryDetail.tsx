@@ -20,8 +20,7 @@ function getAiSummaryMarkdown(aiSummary: string | null): string {
 
   const cleaned = aiSummary
     .trim()
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/, "")
+    .replace(/^```(?:json\s*)?/i, "")
     .replace(/\s*```$/, "")
     .trim();
 
@@ -34,13 +33,13 @@ function getAiSummaryMarkdown(aiSummary: string | null): string {
       "summary" in parsed &&
       typeof parsed.summary === "string"
     ) {
-      return parsed.summary;
+      return parsed.summary.trim();
     }
   } catch {
-    // Fall through to return original content
+    // Invalid/non-JSON summary format: fall back to cleaned text.
   }
 
-  return aiSummary;
+  return cleaned;
 }
 
 export default function EntryDetail() {
