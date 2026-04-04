@@ -14,6 +14,7 @@ import {
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
+import { getAiSummaryMarkdown } from "@/lib/ai-summary";
 
 export default function EntryDetail() {
   const params = useParams<{ id: string }>();
@@ -73,6 +74,7 @@ export default function EntryDetail() {
   }
 
   const entry = entryQuery.data;
+  const summaryMarkdown = getAiSummaryMarkdown(entry.aiSummary);
   const date = new Date(entry.createdAtMs);
   const dateStr = date.toLocaleDateString("en-US", {
     weekday: "long",
@@ -163,9 +165,9 @@ export default function EntryDetail() {
         </CardHeader>
         <CardContent>
           {entry.aiStatus === "completed" && entry.aiSummary ? (
-            <p className="text-sm text-foreground/80 leading-relaxed">
-              {entry.aiSummary}
-            </p>
+            <div className="prose prose-sm max-w-none text-foreground/90 leading-relaxed">
+              <Streamdown>{summaryMarkdown}</Streamdown>
+            </div>
           ) : entry.aiStatus === "processing" || entry.aiStatus === "pending" ? (
             <div className="space-y-2">
               <Skeleton className="h-4 w-full" />
