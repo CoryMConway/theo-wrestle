@@ -1,13 +1,3 @@
----
-title: TheoWrestle
-sdk: docker
-emoji: 📚
-colorFrom: indigo
-colorTo: purple
-thumbnail: >-
-  https://cdn-uploads.huggingface.co/production/uploads/69b374f14fbc6a80474f16a8/aumdM2CP3pm6N7xb43hC1.png
-short_description: Wrestle with theology. Share your growth
----
 # TheoWrestle
 
 **Wrestle with theology. Let AI help you see the bigger picture.**
