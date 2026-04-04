@@ -1,4 +1,6 @@
 import { useAuth } from "../hooks/useAuth";
+import { usePwaInstall } from "@/hooks/usePwaInstall";
+import InstallPromptBanner from "@/components/InstallPromptBanner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -28,7 +30,7 @@ import {
   PenLine,
   Sparkles,
 } from "lucide-react";
-import { CSSProperties, useEffect, useRef, useState } from "react";
+import { CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import AuthPage from "@/pages/AuthPage";
@@ -54,6 +56,22 @@ export default function DashboardLayout({
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
   const { loading, user, refresh } = useAuth();
+  const { canInstall, isInstalled, promptInstall } = usePwaInstall();
+  const [installDismissed, setInstallDismissed] = useState(() =>
+    localStorage.getItem("pwa-install-dismissed") === "true"
+  );
+
+  const showInstallBanner = canInstall && !isInstalled && !installDismissed;
+
+  const handleDismissInstall = useCallback(() => {
+    setInstallDismissed(true);
+    localStorage.setItem("pwa-install-dismissed", "true");
+  }, []);
+
+  const handleInstall = useCallback(async () => {
+    await promptInstall();
+    handleDismissInstall();
+  }, [promptInstall, handleDismissInstall]);
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
@@ -68,6 +86,13 @@ export default function DashboardLayout({
   }
 
   return (
+    <>
+    {showInstallBanner && (
+      <InstallPromptBanner
+        onInstall={handleInstall}
+        onDismiss={handleDismissInstall}
+      />
+    )}
     <SidebarProvider
       style={
         {
@@ -79,6 +104,7 @@ export default function DashboardLayout({
         {children}
       </DashboardLayoutContent>
     </SidebarProvider>
+    </>
   );
 }
 
