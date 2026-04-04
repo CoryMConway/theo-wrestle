@@ -1,0 +1,39 @@
+name: Deploy to Hugging Face Space
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  merge-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout GitHub repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # Need full history for merge
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Git for Hugging Face
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Add Hugging Face remote
+        run: |
+          git remote add hf https://coryconway:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/coryconway/TheoWrestle
+
+      - name: Fetch HF repo
+        run: git fetch hf
+
+      - name: Merge main into deploy branch and push to HF main
+        run: |
+          # Create or switch to local deploy branch (tracks HF main)
+          git checkout -B hf-deploy hf/main || git checkout hf-deploy
+          
+          # Merge GitHub main (allow fast-forward or create merge commit)
+          git merge --no-ff origin/main -m "Merge main into hf-deploy for deployment"
+          
+          # Push the result as main to Hugging Face (this triggers rebuild)
+          git push --force hf hf-deploy:main
