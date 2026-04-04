@@ -22,3 +22,5 @@ logs/
 *.db
 *.db-wal
 *.db-shm
+# Notes
+HF_DEPLOY_WORKFLOW.md
