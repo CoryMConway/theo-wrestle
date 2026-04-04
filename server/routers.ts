@@ -15,6 +15,18 @@ import {
   getUserByUsername,
   upsertUser,
   getUserByOpenId,
+  createCircleRequest,
+  getPendingRequestsForUser,
+  getPendingRequestCount,
+  acceptCircleRequest,
+  declineCircleRequest,
+  getCircleMembers,
+  removeCircleMember,
+  getExistingCircleRequest,
+  canViewMemberContent,
+  getJournalEntriesByUserId,
+  getRecentCircleEntries,
+  getSentPendingRequests,
 } from "./db/db.js";
 import { invokeLLM } from "./lib/llm.js";
 import { TRPCError } from "@trpc/server";
@@ -312,6 +324,159 @@ export const appRouter = router({
 
         await summarizeEntry(input.id, ctx.user.id, entry.content);
         return { success: true };
+      }),
+  }),
+
+  circle: router({
+    /** Send a circle request to another user by username. */
+    sendRequest: protectedProcedure
+      .input(z.object({ username: z.string().min(1, "Username is required") }))
+      .mutation(async ({ ctx, input }) => {
+        const target = await getUserByUsername(input.username);
+        if (!target) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "No user found with that username.",
+          });
+        }
+        if (target.id === ctx.user.id) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "You can't add yourself to your circle.",
+          });
+        }
+        const existing = await getExistingCircleRequest(ctx.user.id, target.id);
+        if (existing) {
+          if (existing.status === "accepted") {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "You're already in each other's circle.",
+            });
+          }
+          if (existing.status === "pending") {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "A circle request already exists between you two.",
+            });
+          }
+          // If declined, allow re-requesting — remove old then create new
+          await removeCircleMember(ctx.user.id, target.id);
+        }
+        const id = await createCircleRequest(ctx.user.id, target.id);
+        return { id, toUsername: target.username };
+      }),
+
+    /** Get pending circle requests for the current user (incoming). */
+    pendingRequests: protectedProcedure.query(async ({ ctx }) => {
+      return getPendingRequestsForUser(ctx.user.id);
+    }),
+
+    /** Get outgoing pending requests (sent by current user, awaiting response). */
+    sentRequests: protectedProcedure.query(async ({ ctx }) => {
+      return getSentPendingRequests(ctx.user.id);
+    }),
+
+    /** Get count of pending requests (for badge). */
+    pendingCount: protectedProcedure.query(async ({ ctx }) => {
+      const count = await getPendingRequestCount(ctx.user.id);
+      return { count };
+    }),
+
+    /** Accept a circle request. */
+    acceptRequest: protectedProcedure
+      .input(
+        z.object({
+          requestId: z.number(),
+          shareBack: z.boolean().default(true),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await acceptCircleRequest(input.requestId, ctx.user.id, input.shareBack);
+        return { success: true };
+      }),
+
+    /** Decline a circle request. */
+    declineRequest: protectedProcedure
+      .input(z.object({ requestId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await declineCircleRequest(input.requestId, ctx.user.id);
+        return { success: true };
+      }),
+
+    /** List all circle members. */
+    members: protectedProcedure.query(async ({ ctx }) => {
+      return getCircleMembers(ctx.user.id);
+    }),
+
+    /** Remove a member from your circle (both directions). */
+    removeMember: protectedProcedure
+      .input(z.object({ memberId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await removeCircleMember(ctx.user.id, input.memberId);
+        return { success: true };
+      }),
+
+    /** Get recent entries from circle members (feed). */
+    memberEntries: protectedProcedure
+      .input(
+        z
+          .object({ limit: z.number().min(1).max(50).optional() })
+          .optional()
+      )
+      .query(async ({ ctx, input }) => {
+        const members = await getCircleMembers(ctx.user.id);
+        // Only fetch from members who share with you
+        const visibleIds = members
+          .filter((m) => m.sharesWithYou)
+          .map((m) => m.id);
+        if (visibleIds.length === 0) return [];
+        const entries = await getRecentCircleEntries(
+          visibleIds,
+          input?.limit ?? 10
+        );
+        return entries.map((e) => ({
+          ...e,
+          aiTags: e.aiTags ? (JSON.parse(e.aiTags) as string[]) : [],
+        }));
+      }),
+
+    /** Get a specific member's timeline entries. */
+    memberTimeline: protectedProcedure
+      .input(z.object({ memberId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const allowed = await canViewMemberContent(ctx.user.id, input.memberId);
+        if (!allowed) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this person's content.",
+          });
+        }
+        const entries = await getJournalEntriesByUserId(input.memberId, "desc");
+        return entries.map((e) => ({
+          ...e,
+          aiTags: e.aiTags ? (JSON.parse(e.aiTags) as string[]) : [],
+        }));
+      }),
+
+    /** Get a specific member's latest progression summary. */
+    memberProgression: protectedProcedure
+      .input(z.object({ memberId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const allowed = await canViewMemberContent(ctx.user.id, input.memberId);
+        if (!allowed) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this person's content.",
+          });
+        }
+        const summary = await getLatestProgressionSummary(input.memberId);
+        if (!summary) return null;
+        return {
+          ...summary,
+          keyThemes: summary.keyThemes
+            ? (JSON.parse(summary.keyThemes) as string[])
+            : [],
+        };
       }),
   }),
 

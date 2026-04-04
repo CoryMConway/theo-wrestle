@@ -9,6 +9,8 @@ import Home from "./pages/Home";
 import Timeline from "./pages/Timeline";
 import Progression from "./pages/Progression";
 import EntryDetail from "./pages/EntryDetail";
+import Circles from "./pages/Circles";
+import MemberView from "./pages/MemberView";
 
 function Router() {
   return (
@@ -17,6 +19,8 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/timeline" component={Timeline} />
         <Route path="/progression" component={Progression} />
+        <Route path="/circles" component={Circles} />
+        <Route path="/circle/:memberId" component={MemberView} />
         <Route path="/entry/:id" component={EntryDetail} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />

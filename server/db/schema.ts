@@ -77,3 +77,31 @@ export const progressionSummaries = sqliteTable("progression_summaries", {
 
 export type ProgressionSummary = typeof progressionSummaries.$inferSelect;
 export type InsertProgressionSummary = typeof progressionSummaries.$inferInsert;
+
+/**
+ * Circle requests table — tracks invitations and accepted circle memberships.
+ * An accepted request IS the membership record.
+ * `shareBack` controls whether the acceptor shares their content with the requester.
+ */
+export const circleRequests = sqliteTable("circle_requests", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  /** User who sent the circle request */
+  fromUserId: integer("fromUserId").notNull(),
+  /** User who received the circle request */
+  toUserId: integer("toUserId").notNull(),
+  /** pending = awaiting response, accepted = in circle, declined = rejected */
+  status: text("status", { enum: ["pending", "accepted", "declined"] })
+    .default("pending")
+    .notNull(),
+  /** Whether the acceptor shares their content back (1 = yes, 0 = no) */
+  shareBack: integer("shareBack").default(1).notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updatedAt", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type CircleRequest = typeof circleRequests.$inferSelect;
+export type InsertCircleRequest = typeof circleRequests.$inferInsert;

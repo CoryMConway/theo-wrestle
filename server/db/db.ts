@@ -11,6 +11,8 @@ import {
   progressionSummaries,
   InsertProgressionSummary,
   ProgressionSummary,
+  circleRequests,
+  CircleRequest,
 } from "./schema.js";
 import { ENV } from "../env.js";
 
@@ -53,6 +55,17 @@ function createTables(sqlite: Database.Database) {
       entriesAnalyzed INTEGER NOT NULL,
       keyThemes TEXT,
       createdAtMs INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS circle_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fromUserId INTEGER NOT NULL,
+      toUserId INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      shareBack INTEGER NOT NULL DEFAULT 1,
+      createdAt INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL,
+      UNIQUE(fromUserId, toUserId)
     );
   `);
 }
@@ -374,4 +387,377 @@ export async function getProgressionSummaries(
     .where(eq(progressionSummaries.userId, userId))
     .orderBy(desc(progressionSummaries.createdAtMs))
     .all();
+}
+
+// ─── Circle Helpers ──────────────────────────────────────────────────
+
+/** Create a pending circle request from one user to another. */
+export async function createCircleRequest(
+  fromUserId: number,
+  toUserId: number
+): Promise<number> {
+  const db = getDb();
+  const result = db
+    .insert(circleRequests)
+    .values({
+      fromUserId,
+      toUserId,
+      status: "pending",
+      shareBack: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .run();
+  return Number(result.lastInsertRowid);
+}
+
+/** Get all pending circle requests sent TO a user, with requester info. */
+export async function getPendingRequestsForUser(
+  userId: number
+): Promise<Array<CircleRequest & { fromUsername: string | null; fromName: string | null }>> {
+  const db = getDb();
+  const rows = db
+    .select({
+      id: circleRequests.id,
+      fromUserId: circleRequests.fromUserId,
+      toUserId: circleRequests.toUserId,
+      status: circleRequests.status,
+      shareBack: circleRequests.shareBack,
+      createdAt: circleRequests.createdAt,
+      updatedAt: circleRequests.updatedAt,
+      fromUsername: users.username,
+      fromName: users.name,
+    })
+    .from(circleRequests)
+    .innerJoin(users, eq(users.id, circleRequests.fromUserId))
+    .where(
+      and(
+        eq(circleRequests.toUserId, userId),
+        eq(circleRequests.status, "pending")
+      )
+    )
+    .orderBy(desc(circleRequests.createdAt))
+    .all();
+  return rows;
+}
+
+/** Get pending circle requests sent BY a user (outgoing), with target info. */
+export async function getSentPendingRequests(
+  userId: number
+): Promise<Array<CircleRequest & { toUsername: string | null; toName: string | null }>> {
+  const db = getDb();
+  const rows = db
+    .select({
+      id: circleRequests.id,
+      fromUserId: circleRequests.fromUserId,
+      toUserId: circleRequests.toUserId,
+      status: circleRequests.status,
+      shareBack: circleRequests.shareBack,
+      createdAt: circleRequests.createdAt,
+      updatedAt: circleRequests.updatedAt,
+      toUsername: users.username,
+      toName: users.name,
+    })
+    .from(circleRequests)
+    .innerJoin(users, eq(users.id, circleRequests.toUserId))
+    .where(
+      and(
+        eq(circleRequests.fromUserId, userId),
+        eq(circleRequests.status, "pending")
+      )
+    )
+    .orderBy(desc(circleRequests.createdAt))
+    .all();
+  return rows;
+}
+
+/** Count pending circle requests for a user (for badge). */
+export async function getPendingRequestCount(userId: number): Promise<number> {
+  const db = getDb();
+  const result = db
+    .select({ count: sql<number>`count(*)` })
+    .from(circleRequests)
+    .where(
+      and(
+        eq(circleRequests.toUserId, userId),
+        eq(circleRequests.status, "pending")
+      )
+    )
+    .get();
+  return result?.count ?? 0;
+}
+
+/** Accept a circle request. */
+export async function acceptCircleRequest(
+  requestId: number,
+  userId: number,
+  shareBack: boolean
+): Promise<void> {
+  const db = getDb();
+  db.update(circleRequests)
+    .set({
+      status: "accepted",
+      shareBack: shareBack ? 1 : 0,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(circleRequests.id, requestId),
+        eq(circleRequests.toUserId, userId)
+      )
+    )
+    .run();
+}
+
+/** Decline a circle request. */
+export async function declineCircleRequest(
+  requestId: number,
+  userId: number
+): Promise<void> {
+  const db = getDb();
+  db.update(circleRequests)
+    .set({ status: "declined", updatedAt: new Date() })
+    .where(
+      and(
+        eq(circleRequests.id, requestId),
+        eq(circleRequests.toUserId, userId)
+      )
+    )
+    .run();
+}
+
+/**
+ * Get all circle members for a user.
+ * A "member" is someone with an accepted circle request in either direction.
+ * Returns info about each member and whether they share their content.
+ */
+export async function getCircleMembers(
+  userId: number
+): Promise<
+  Array<{
+    id: number;
+    username: string | null;
+    name: string | null;
+    sharesWithYou: boolean;
+    youShareWithThem: boolean;
+  }>
+> {
+  const db = getDb();
+
+  // Requests I sent that were accepted → I can see their content if shareBack=1
+  const sentAccepted = db
+    .select({
+      memberId: circleRequests.toUserId,
+      shareBack: circleRequests.shareBack,
+    })
+    .from(circleRequests)
+    .where(
+      and(
+        eq(circleRequests.fromUserId, userId),
+        eq(circleRequests.status, "accepted")
+      )
+    )
+    .all();
+
+  // Requests I received that I accepted → they can always see my content (I accepted their request)
+  const receivedAccepted = db
+    .select({
+      memberId: circleRequests.fromUserId,
+      shareBack: circleRequests.shareBack,
+    })
+    .from(circleRequests)
+    .where(
+      and(
+        eq(circleRequests.toUserId, userId),
+        eq(circleRequests.status, "accepted")
+      )
+    )
+    .all();
+
+  // Build a map of member info
+  const memberMap = new Map<
+    number,
+    { sharesWithYou: boolean; youShareWithThem: boolean }
+  >();
+
+  // For requests I sent: the recipient always sees my content (I initiated sharing).
+  // I see their content only if they set shareBack=1.
+  for (const r of sentAccepted) {
+    const existing = memberMap.get(r.memberId) || {
+      sharesWithYou: false,
+      youShareWithThem: false,
+    };
+    existing.sharesWithYou = r.shareBack === 1;
+    existing.youShareWithThem = true; // I sent the request = I share with them
+    memberMap.set(r.memberId, existing);
+  }
+
+  // For requests I received: I always share if there's an accepted request from them.
+  // They share with me = always true (they initiated).
+  for (const r of receivedAccepted) {
+    const existing = memberMap.get(r.memberId) || {
+      sharesWithYou: false,
+      youShareWithThem: false,
+    };
+    existing.sharesWithYou = true; // They initiated = they share with me
+    existing.youShareWithThem = r.shareBack === 1; // I share back only if I opted in
+    memberMap.set(r.memberId, existing);
+  }
+
+  if (memberMap.size === 0) return [];
+
+  // Fetch user info for all members
+  const memberIds = Array.from(memberMap.keys());
+  const memberUsers = db
+    .select({ id: users.id, username: users.username, name: users.name })
+    .from(users)
+    .where(sql`${users.id} IN (${sql.join(memberIds.map(id => sql`${id}`), sql`, `)})`)
+    .all();
+
+  return memberUsers.map((u) => {
+    const info = memberMap.get(u.id)!;
+    return {
+      id: u.id,
+      username: u.username,
+      name: u.name,
+      sharesWithYou: info.sharesWithYou,
+      youShareWithThem: info.youShareWithThem,
+    };
+  });
+}
+
+/** Remove a circle member (deletes requests in both directions). */
+export async function removeCircleMember(
+  userId: number,
+  memberId: number
+): Promise<void> {
+  const db = getDb();
+  // Delete request from me to them
+  db.delete(circleRequests)
+    .where(
+      and(
+        eq(circleRequests.fromUserId, userId),
+        eq(circleRequests.toUserId, memberId)
+      )
+    )
+    .run();
+  // Delete request from them to me
+  db.delete(circleRequests)
+    .where(
+      and(
+        eq(circleRequests.fromUserId, memberId),
+        eq(circleRequests.toUserId, userId)
+      )
+    )
+    .run();
+}
+
+/** Check if an existing request exists between two users (any direction, any status). */
+export async function getExistingCircleRequest(
+  userA: number,
+  userB: number
+): Promise<CircleRequest | undefined> {
+  const db = getDb();
+  return db
+    .select()
+    .from(circleRequests)
+    .where(
+      sql`(${circleRequests.fromUserId} = ${userA} AND ${circleRequests.toUserId} = ${userB})
+        OR (${circleRequests.fromUserId} = ${userB} AND ${circleRequests.toUserId} = ${userA})`
+    )
+    .limit(1)
+    .get();
+}
+
+/**
+ * Check if userId can view memberId's content.
+ * True if there's an accepted request where memberId shares with userId.
+ */
+export async function canViewMemberContent(
+  userId: number,
+  memberId: number
+): Promise<boolean> {
+  const db = getDb();
+
+  // Case 1: I sent a request to them, they accepted with shareBack=1
+  const sentReq = db
+    .select()
+    .from(circleRequests)
+    .where(
+      and(
+        eq(circleRequests.fromUserId, userId),
+        eq(circleRequests.toUserId, memberId),
+        eq(circleRequests.status, "accepted"),
+        eq(circleRequests.shareBack, 1)
+      )
+    )
+    .limit(1)
+    .get();
+  if (sentReq) return true;
+
+  // Case 2: They sent a request to me, accepted = they always share
+  const receivedReq = db
+    .select()
+    .from(circleRequests)
+    .where(
+      and(
+        eq(circleRequests.fromUserId, memberId),
+        eq(circleRequests.toUserId, userId),
+        eq(circleRequests.status, "accepted")
+      )
+    )
+    .limit(1)
+    .get();
+  if (receivedReq) return true;
+
+  return false;
+}
+
+/** Get journal entries for a specific user (for circle member viewing). */
+export async function getJournalEntriesByUserId(
+  userId: number,
+  order: "asc" | "desc" = "desc",
+  limit?: number
+): Promise<JournalEntry[]> {
+  const db = getDb();
+  const orderFn = order === "asc" ? asc : desc;
+  let query = db
+    .select()
+    .from(journalEntries)
+    .where(eq(journalEntries.userId, userId))
+    .orderBy(orderFn(journalEntries.createdAtMs));
+  if (limit) {
+    query = query.limit(limit) as typeof query;
+  }
+  return query.all();
+}
+
+/** Get recent entries from multiple users (for circle feed). */
+export async function getRecentCircleEntries(
+  memberIds: number[],
+  limit: number = 10
+): Promise<Array<JournalEntry & { username: string | null; memberName: string | null }>> {
+  if (memberIds.length === 0) return [];
+  const db = getDb();
+  const rows = db
+    .select({
+      id: journalEntries.id,
+      userId: journalEntries.userId,
+      content: journalEntries.content,
+      title: journalEntries.title,
+      aiSummary: journalEntries.aiSummary,
+      aiTags: journalEntries.aiTags,
+      aiStatus: journalEntries.aiStatus,
+      createdAtMs: journalEntries.createdAtMs,
+      updatedAtMs: journalEntries.updatedAtMs,
+      username: users.username,
+      memberName: users.name,
+    })
+    .from(journalEntries)
+    .innerJoin(users, eq(users.id, journalEntries.userId))
+    .where(sql`${journalEntries.userId} IN (${sql.join(memberIds.map(id => sql`${id}`), sql`, `)})`)
+    .orderBy(desc(journalEntries.createdAtMs))
+    .limit(limit)
+    .all();
+  return rows;
 }

@@ -29,16 +29,19 @@ import {
   PanelLeft,
   PenLine,
   Sparkles,
+  Users,
 } from "lucide-react";
 import { CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import AuthPage from "@/pages/AuthPage";
+import { trpc } from "@/lib/trpc-client";
 
 const menuItems = [
   { icon: PenLine, label: "New Entry", path: "/" },
   { icon: Clock, label: "Timeline", path: "/timeline" },
   { icon: Sparkles, label: "Progression", path: "/progression" },
+  { icon: Users, label: "Your Circles", path: "/circles" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -126,6 +129,11 @@ function DashboardLayoutContent({
   const activeMenuItem = menuItems.find((item) => item.path === location);
   const isMobile = useIsMobile();
 
+  // Poll for pending circle request count (badge)
+  const pendingCountQuery = trpc.circle.pendingCount.useQuery(undefined, {
+    refetchInterval: 30000,
+  });
+
   useEffect(() => {
     if (isCollapsed) {
       setIsResizing(false);
@@ -193,6 +201,10 @@ function DashboardLayoutContent({
             <SidebarMenu className="px-2 py-1">
               {menuItems.map((item) => {
                 const isActive = location === item.path;
+                const pendingCount =
+                  item.path === "/circles"
+                    ? (pendingCountQuery.data?.count ?? 0)
+                    : 0;
                 return (
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton
@@ -201,10 +213,22 @@ function DashboardLayoutContent({
                       tooltip={item.label}
                       className="h-10 transition-all font-normal"
                     >
-                      <item.icon
-                        className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
-                      />
+                      <div className="relative">
+                        <item.icon
+                          className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
+                        />
+                        {pendingCount > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary/70 text-[10px] font-medium text-primary-foreground">
+                            {pendingCount > 9 ? "9+" : pendingCount}
+                          </span>
+                        )}
+                      </div>
                       <span>{item.label}</span>
+                      {pendingCount > 0 && (
+                        <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-primary/70 text-[10px] font-medium text-primary-foreground">
+                          {pendingCount > 9 ? "9+" : pendingCount}
+                        </span>
+                      )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
