@@ -146,13 +146,11 @@ const normalizeToolChoice = (
 };
 
 const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
+  `https://api-inference.huggingface.co/v1/chat/completions`;
 
 const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("BUILT_IN_FORGE_API_KEY is not configured");
+  if (!ENV.hfToken) {
+    throw new Error("HF_TOKEN is not configured");
   }
 };
 
@@ -189,7 +187,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     params;
 
   const payload: Record<string, unknown> = {
-    model: "gemini-2.5-flash",
+    model: ENV.hfModel,
     messages: messages.map(normalizeMessage),
   };
 
@@ -198,8 +196,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const normalizedToolChoice = normalizeToolChoice(toolChoice || tool_choice, tools);
   if (normalizedToolChoice) payload.tool_choice = normalizedToolChoice;
 
-  payload.max_tokens = 32768;
-  payload.thinking = { budget_tokens: 128 };
+  payload.max_tokens = 8192;
 
   const normalizedResponseFormat = normalizeResponseFormat({
     responseFormat,
@@ -213,7 +210,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${ENV.hfToken}`,
     },
     body: JSON.stringify(payload),
   });

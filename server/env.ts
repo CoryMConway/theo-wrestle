@@ -6,8 +6,8 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   /** Demo mode: no real OAuth configured — use dev-login */
   isDemoMode: !process.env.OAUTH_SERVER_URL,
-  forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
-  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  hfToken: process.env.HF_TOKEN ?? "",
+  hfModel: process.env.HF_MODEL ?? "meta-llama/Meta-Llama-3-8B-Instruct",
   port: parseInt(process.env.PORT ?? "3000", 10),
   /** SQLite database file path. On HuggingFace, /data is a persistent volume. */
   sqlitePath:

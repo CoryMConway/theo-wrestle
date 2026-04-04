@@ -91,8 +91,8 @@ The client runs at `http://localhost:5173` and the API server at `http://localho
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `JWT_SECRET` | Secret for signing auth cookies | `dev-secret-change-me` |
-| `BUILT_IN_FORGE_API_URL` | LLM API endpoint | — |
-| `BUILT_IN_FORGE_API_KEY` | LLM API key | — |
+| `HF_TOKEN` | Hugging Face Access Token for LLM API | — |
+| `HF_MODEL` | Hugging Face Model ID for LLM API | `meta-llama/Meta-Llama-3-8B-Instruct` |
 | `SQLITE_PATH` | Path to SQLite database file | `./theowrestle.db` (dev) / `/data/theowrestle.db` (prod) |
 | `PORT` | Server port | `3000` |
 
@@ -111,8 +111,8 @@ The client runs at `http://localhost:5173` and the API server at `http://localho
 docker build -t theowrestle .
 docker run -p 7860:7860 \
   -e JWT_SECRET=your-secret \
-  -e BUILT_IN_FORGE_API_URL=https://your-llm-endpoint \
-  -e BUILT_IN_FORGE_API_KEY=your-key \
+  -e HF_TOKEN=your-hf-token \
+  -e HF_MODEL=meta-llama/Meta-Llama-3-8B-Instruct \
   -v theowrestle-data:/data \
   theowrestle
 ```
