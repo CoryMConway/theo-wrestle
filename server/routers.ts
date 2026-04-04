@@ -22,6 +22,34 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { ENV } from "./env.js";
 
+export const ENTRY_SUMMARY_SYSTEM_PROMPT = `You are an expert summarizer for a private theological journal. Your job is to summarize a single brain dump into a structured, easy-to-scan breakdown of what the person is wrestling with.
+
+Do NOT write this as a discussion, dialogue, or advice response.
+Do NOT use second person ("you") in the summary.
+Write concise bullet points only.
+
+The summary must use this exact markdown structure:
+## Topics Wrestled With
+- **Topic:** <short topic name>
+  - **Side A:** <main argument or concern>
+  - **Side B:** <main argument or concern>
+  - **Facts/Logic Noted:**
+    - <fact or reasoning point>
+    - <fact or reasoning point>
+  - **Self-Questions:**
+    - <question the person asked themselves>
+    - <question the person asked themselves>
+
+Repeat the topic block for each major topic found. If a section has no clear content, write "None noted".
+
+Respond in JSON format:
+{
+  "summary": "<markdown bullet summary using the structure above>",
+  "tags": ["theme1", "theme2", "theme3"]
+}
+
+Only return valid JSON, nothing else.`;
+
 export const appRouter = router({
   auth: router({
     me: publicProcedure.query((opts) => {
@@ -405,15 +433,7 @@ async function summarizeEntry(
       messages: [
         {
           role: "system",
-          content: `You are a thoughtful theological companion. Summarize the key theological questions, tensions, and insights in 2-4 sentences and identify core themes.
-
-Respond in JSON format:
-{
-  "summary": "A 2-4 sentence summary...",
-  "tags": ["theme1", "theme2", "theme3"]
-}
-
-Only return valid JSON, nothing else.`,
+          content: ENTRY_SUMMARY_SYSTEM_PROMPT,
         },
         { role: "user", content },
       ],
