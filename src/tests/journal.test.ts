@@ -126,7 +126,7 @@ describe("entry summary prompt", () => {
     expect(ENTRY_SUMMARY_SYSTEM_PROMPT).toContain("**Topic:**");
     expect(ENTRY_SUMMARY_SYSTEM_PROMPT).toContain("**Side A:**");
     expect(ENTRY_SUMMARY_SYSTEM_PROMPT).toContain("**Side B:**");
-    expect(ENTRY_SUMMARY_SYSTEM_PROMPT).toContain("**Facts/Logic Noted:**");
+    expect(ENTRY_SUMMARY_SYSTEM_PROMPT).toContain("**Key Facts & References Noted:**");
     expect(ENTRY_SUMMARY_SYSTEM_PROMPT).toContain("**Self-Questions:**");
     expect(ENTRY_SUMMARY_SYSTEM_PROMPT).toContain("Do NOT write this as a discussion");
   });
