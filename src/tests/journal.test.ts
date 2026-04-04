@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { appRouter } from "../../server/routers.js";
+import { appRouter, ENTRY_SUMMARY_SYSTEM_PROMPT } from "../../server/routers.js";
 import type { TrpcContext } from "../../server/context.js";
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
@@ -117,5 +117,17 @@ describe("progression routes", () => {
 
       await expect(caller.progression.stats()).rejects.toThrow();
     });
+  });
+});
+
+describe("entry summary prompt", () => {
+  it("requires structured summary sections for topics, sides, facts/logic, and self-questions", () => {
+    expect(ENTRY_SUMMARY_SYSTEM_PROMPT).toContain("## Topics Wrestled With");
+    expect(ENTRY_SUMMARY_SYSTEM_PROMPT).toContain("**Topic:**");
+    expect(ENTRY_SUMMARY_SYSTEM_PROMPT).toContain("**Side A:**");
+    expect(ENTRY_SUMMARY_SYSTEM_PROMPT).toContain("**Side B:**");
+    expect(ENTRY_SUMMARY_SYSTEM_PROMPT).toContain("**Facts/Logic Noted:**");
+    expect(ENTRY_SUMMARY_SYSTEM_PROMPT).toContain("**Self-Questions:**");
+    expect(ENTRY_SUMMARY_SYSTEM_PROMPT).toContain("Do NOT write this as a discussion");
   });
 });
