@@ -19,13 +19,15 @@ function getAiSummaryMarkdown(aiSummary: string | null): string {
   if (!aiSummary) return "";
 
   const cleaned = aiSummary
-    .replace(/```json\n?/g, "")
-    .replace(/```\n?/g, "")
+    .trim()
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/, "")
+    .replace(/\s*```$/, "")
     .trim();
 
   try {
     const parsed = JSON.parse(cleaned);
-    if (typeof parsed === "string") return parsed;
+    if (typeof parsed === "string") return parsed.trim();
     if (
       parsed &&
       typeof parsed === "object" &&
