@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc-client";
 import { useState } from "react";
 import { toast } from "sonner";
+import { isOfficialHostedInstance } from "@/lib/hosting";
 
 type AuthMode = "login" | "register";
 
@@ -43,6 +44,23 @@ export default function AuthPage() {
     if (mode === "login") {
       loginMutation.mutate({ username, password });
     } else {
+      if (
+        isOfficialHostedInstance(window.location.href) &&
+        !window.confirm(
+          "You're using the official free shared instance. Could you host your own free fork for your community first so this project can reach more people?"
+        )
+      ) {
+        return;
+      }
+
+      if (
+        !window.confirm(
+          "Please confirm: you can't host your own free version on Hugging Face right now."
+        )
+      ) {
+        return;
+      }
+
       registerMutation.mutate({ username, password, name });
     }
   };
@@ -72,24 +90,33 @@ export default function AuthPage() {
           )}
 
           {mode === "register" && (
-            <div className="space-y-1.5">
-              <label
-                htmlFor="name"
-                className="text-sm font-medium text-foreground"
-              >
-                Display name
-              </label>
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Your name"
-                required
-                autoComplete="name"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              />
-            </div>
+            <>
+              {isOfficialHostedInstance(window.location.href) && (
+                <div className="bg-amber-500/10 text-amber-700 text-sm rounded-lg px-4 py-3">
+                  This shared free instance has limited capacity. If you can,
+                  please host your own free fork on Hugging Face for your
+                  community.
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="name"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Display name
+                </label>
+                <input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your name"
+                  required
+                  autoComplete="name"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                />
+              </div>
+            </>
           )}
 
           <div className="space-y-1.5">

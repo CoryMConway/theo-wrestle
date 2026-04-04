@@ -15,6 +15,19 @@ TheoWrestle is a journaling app for anyone exploring theology — whether you're
 
 TheoWrestle is hosted for free at **[coryconway-theowrestle.hf.space](https://coryconway-theowrestle.hf.space/)**. Create an account and start journaling — no setup required.
 
+## Host your own instance (free on Hugging Face)
+
+If you’re running a community and want your own free deployment:
+
+1. Fork this repo on GitHub.
+2. Go to https://huggingface.co/new-space, choose your SDK, then select **GitHub repository** and paste your fork URL.
+3. Deploy — it will build the same app from your fork.
+
+### Keep your fork updated
+
+- In your GitHub fork, click **Sync fork** whenever new updates land on `main`.
+- Your Hugging Face Space will automatically rebuild after your next push.
+
 ## Features
 
 - **Brain-dump journaling** — Write freely without structure. Entries are your raw theological wrestling.
