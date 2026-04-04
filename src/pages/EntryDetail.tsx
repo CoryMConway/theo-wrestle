@@ -15,6 +15,32 @@ import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
 
+function getAiSummaryMarkdown(aiSummary: string | null): string {
+  if (!aiSummary) return "";
+
+  const cleaned = aiSummary
+    .replace(/```json\n?/g, "")
+    .replace(/```\n?/g, "")
+    .trim();
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (typeof parsed === "string") return parsed;
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      "summary" in parsed &&
+      typeof parsed.summary === "string"
+    ) {
+      return parsed.summary;
+    }
+  } catch {
+    // Fall through to return original content
+  }
+
+  return aiSummary;
+}
+
 export default function EntryDetail() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
@@ -73,6 +99,7 @@ export default function EntryDetail() {
   }
 
   const entry = entryQuery.data;
+  const summaryMarkdown = getAiSummaryMarkdown(entry.aiSummary);
   const date = new Date(entry.createdAtMs);
   const dateStr = date.toLocaleDateString("en-US", {
     weekday: "long",
@@ -163,9 +190,9 @@ export default function EntryDetail() {
         </CardHeader>
         <CardContent>
           {entry.aiStatus === "completed" && entry.aiSummary ? (
-            <p className="text-sm text-foreground/80 leading-relaxed">
-              {entry.aiSummary}
-            </p>
+            <div className="prose prose-sm max-w-none text-foreground/90 leading-relaxed">
+              <Streamdown>{summaryMarkdown}</Streamdown>
+            </div>
           ) : entry.aiStatus === "processing" || entry.aiStatus === "pending" ? (
             <div className="space-y-2">
               <Skeleton className="h-4 w-full" />
