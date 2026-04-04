@@ -74,6 +74,7 @@ describe("registerServiceWorker", () => {
 
     expect(controllerChangeListeners).toHaveLength(1);
     controllerChangeListeners[0]();
+    expect(reload).toHaveBeenCalledTimes(1);
     controllerChangeListeners[0]();
     expect(reload).toHaveBeenCalledTimes(1);
   });
