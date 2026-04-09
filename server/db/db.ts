@@ -17,6 +17,7 @@ import {
 import { ENV } from "../env.js";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _sqlite: Database.Database | null = null;
 
 // ─── SQLite Connection ───────────────────────────────────────────────
 
@@ -78,7 +79,35 @@ export function getDb() {
     sqlite.pragma("journal_mode = WAL");
     sqlite.pragma("foreign_keys = ON");
     createTables(sqlite);
+    _sqlite = sqlite;
     _db = drizzle(sqlite);
+
+    // Periodic WAL checkpoint every 5 minutes (PASSIVE = non-blocking)
+    setInterval(() => {
+      try {
+        sqlite.pragma("wal_checkpoint(PASSIVE)");
+        console.log("[Database] Periodic WAL checkpoint completed");
+      } catch (err) {
+        console.error("[Database] Periodic WAL checkpoint failed:", err);
+      }
+    }, 5 * 60 * 1000);
+
+    // Graceful shutdown: checkpoint + close before container dies
+    const gracefulShutdown = (signal: string) => {
+      console.log(`[Database] Received ${signal}, checkpointing WAL...`);
+      try {
+        sqlite.pragma("wal_checkpoint(TRUNCATE)");
+        console.log("[Database] WAL checkpoint (TRUNCATE) completed");
+        sqlite.close();
+        console.log("[Database] Connection closed");
+      } catch (err) {
+        console.error("[Database] Shutdown checkpoint failed:", err);
+      }
+      process.exit(0);
+    };
+
+    process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+    process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   }
   return _db;
 }

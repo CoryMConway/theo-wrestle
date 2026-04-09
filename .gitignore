@@ -23,4 +23,4 @@ logs/
 *.db-wal
 *.db-shm
 # Notes
-HF_DEPLOY_WORKFLOW.md
+PERSONAL_NOTES.md
