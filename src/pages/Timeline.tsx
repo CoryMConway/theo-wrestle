@@ -108,8 +108,8 @@ export default function Timeline() {
         </p>
       </div>
 
-      {grouped.map(({ label, entries: monthEntries }) => (
-        <div key={label} className="space-y-4">
+      {grouped.map(({ key, label, entries: monthEntries }) => (
+        <div key={key} className="space-y-4">
           <div className="flex items-center gap-3">
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
               {label}

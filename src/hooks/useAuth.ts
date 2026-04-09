@@ -29,7 +29,7 @@ export function useAuth() {
       throw error;
     } finally {
       utils.auth.me.setData(undefined, null);
-      await utils.auth.me.invalidate();
+      await utils.invalidate();
     }
   }, [logoutMutation, utils]);
 

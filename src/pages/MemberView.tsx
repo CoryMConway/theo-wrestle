@@ -199,8 +199,8 @@ function WrestlingsTab({
 
   return (
     <div className="space-y-6">
-      {grouped.map(({ label, entries: monthEntries }) => (
-        <div key={label} className="space-y-3">
+      {grouped.map(({ key, label, entries: monthEntries }) => (
+        <div key={key} className="space-y-3">
           <div className="flex items-center gap-3">
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
               {label}
