@@ -42,7 +42,7 @@ export default function AuthPage() {
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: async () => {
       toast.success("Signed in successfully");
-      await utils.auth.me.invalidate();
+      await utils.invalidate();
     },
     onError: (err) => {
       setError(err.message);
@@ -52,7 +52,7 @@ export default function AuthPage() {
   const registerMutation = trpc.auth.register.useMutation({
     onSuccess: async () => {
       toast.success("Account created! You're now signed in.");
-      await utils.auth.me.invalidate();
+      await utils.invalidate();
     },
     onError: (err) => {
       setError(err.message);
